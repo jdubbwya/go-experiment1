@@ -61,7 +61,6 @@ func HandleQueue(w http.ResponseWriter, r *http.Request){
 		h512 := sha512.New()
 		io.WriteString(h512, rawPassword)
 		hashedPasswords.Store( id, base64.StdEncoding.EncodeToString(h512.Sum(nil)) )
-		log.Printf("Stored hash password for %d", id )
 		benchmark.StopCapture(mark)
 		stats.Capture(mark)
 	}()
@@ -70,17 +69,15 @@ func HandleQueue(w http.ResponseWriter, r *http.Request){
 func HandleEntry(w http.ResponseWriter, r *http.Request){
 	w.Header().Add("Content-Type", "text/plain")
 
-	log.Printf("Url Path: %s", r.URL.Path)
-
 	var pathParts = strings.Split(r.URL.Path, "/")
 
-	if len(pathParts) > 2 {
+	if len(pathParts) > 3 {
 		w.WriteHeader(http.StatusNotFound)
 		io.WriteString(w, "Resource not found.")
 		return
 	}
 
-	var entryId = pathParts[1]
+	var entryId = pathParts[2]
 	var id, err = strconv.ParseUint(entryId, 0, 64)
 	if err != nil || id > maxId {
 		w.WriteHeader(http.StatusBadRequest)
@@ -88,7 +85,7 @@ func HandleEntry(w http.ResponseWriter, r *http.Request){
 		return
 	}
 
-	var mapEntry, ok = hashedPasswords.Load(entryId)
+	var mapEntry, ok = hashedPasswords.Load(id)
 	if ! ok {
 		w.WriteHeader(http.StatusTooEarly)
 		io.WriteString(w, "Request is still processing")

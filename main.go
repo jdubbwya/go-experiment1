@@ -5,6 +5,7 @@ import (
 	"github.com/jdubbwya/go-experiment1/middleware"
 	"github.com/jdubbwya/go-experiment1/stats"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -12,18 +13,18 @@ import (
 
 func main() {
 
+	http.Handle("/hash/",
+		middleware.MonitorRequest(
+			middleware.AllowOnly(
+				http.HandlerFunc(hasher.HandleEntry),
+				[]string{http.MethodGet})))
+
 	http.Handle(
 		"/hash",
 		middleware.MonitorRequest(
 			middleware.AllowOnly(
 				http.HandlerFunc(hasher.HandleQueue),
-				[]string{http.MethodPost, http.MethodGet})))
-
-	http.Handle("/hash/\\d+",
-		middleware.MonitorRequest(
-			middleware.AllowOnly(
-				http.HandlerFunc(hasher.HandleEntry),
-				[]string{http.MethodGet})))
+				[]string{http.MethodPost})))
 
 	http.Handle("/stats",
 		middleware.MonitorRequest(
@@ -35,6 +36,7 @@ func main() {
 		"/shutdown",
 		middleware.AllowOnly(
 			http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+				log.Println("Shutdown requested")
 				close(middleware.Monitor.Channel)
 				writer.Header().Add("Content-Type", "text/plain")
 				writer.WriteHeader(http.StatusOK)
@@ -47,5 +49,6 @@ func main() {
 			}),
 			[]string{http.MethodGet}))
 
-	http.ListenAndServe(":8080", nil)
+	defer http.ListenAndServe(":8080", nil)
+	log.Println("Server listening at http://localhost:8080")
 }
