@@ -10,20 +10,48 @@ import (
 )
 
 var testUrl string = "localhost:8080"
+var runningInstance *server.Instance
 
 func makeUrl( path string ) string {
 	return fmt.Sprintf("http://%s%s", testUrl, path)
 }
 
-func startServer(){
-	go func() {
-		server.Start(&testUrl)
-	}()
+func beforeEach(){
+	if runningInstance == nil || !runningInstance.IsAlive() {
+		instance := server.NewInstance(&testUrl)
+		runningInstance = &instance
+		go func() {
+			runningInstance.Start()
+		}()
+	}
+
 }
 
-func TestGracefulShutdown(t *testing.T) {
+type testCase struct {
+	name string
+	test func(t *testing.T)
+}
 
-	startServer()
+func TestServerSuite(t *testing.T) {
+
+	cases := []testCase{
+		testCase{
+			"Server: Verify Graceful shutdown",
+			serverTestCaseGracefulShutdown,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			beforeEach()
+			c.test(t)
+		})
+	}
+
+}
+
+func serverTestCaseGracefulShutdown(t *testing.T) {
+
 	var parallelGets = sync.WaitGroup{}
 
 	type httpResponse struct {
