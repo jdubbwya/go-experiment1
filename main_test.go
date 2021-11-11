@@ -5,8 +5,11 @@ import (
 	"github.com/jdubbwya/go-experiment1/server"
 	"log"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 var testUrl string = "localhost:8080"
@@ -17,13 +20,14 @@ func makeUrl( path string ) string {
 }
 
 func beforeEach(){
-	if runningInstance == nil || !runningInstance.IsAlive() {
-		instance := server.NewInstance(&testUrl)
-		runningInstance = &instance
-		go func() {
-			runningInstance.Start()
-		}()
+	if runningInstance != nil && runningInstance.IsAlive() {
+		runningInstance.Kill()
 	}
+	instance := server.NewInstance(&testUrl)
+	runningInstance = &instance
+	go func() {
+		runningInstance.Start()
+	}()
 
 }
 
@@ -38,6 +42,10 @@ func TestServerSuite(t *testing.T) {
 		testCase{
 			"Server: Verify Graceful shutdown",
 			serverTestCaseGracefulShutdown,
+		},
+		{
+			name: "Server: /hash/{id} responds after 5 seconds",
+			test: serverTestCaseHashTransactionAfter5seconds,
 		},
 	}
 
@@ -72,9 +80,9 @@ func serverTestCaseGracefulShutdown(t *testing.T) {
 
 	go func(wg *sync.WaitGroup, response *httpResponse) {
 		res, err := http.Get(makeUrl("/stats"))
-		(*response).statusCode = res.StatusCode
+		response.statusCode = res.StatusCode
 		if err != nil {
-			(*response).err = &err
+			response.err = &err
 		}
 		wg.Done()
 	}( &parallelGets, &statsResponse )
@@ -104,5 +112,26 @@ func serverTestCaseGracefulShutdown(t *testing.T) {
 
 	if shutdownResponse.statusCode > 299 {
 		log.Fatalf("Shutdown response failed with status code: %d\n", shutdownResponse.statusCode)
+	}
+}
+
+func serverTestCaseHashTransactionAfter5seconds(t *testing.T) {
+	formData := url.Values{
+		"password": { "angryMonkey231569745269" },
+	}
+
+	http.Post(makeUrl("/hash"), "application/x-www-form-urlencoded", strings.NewReader(formData.Encode()))
+	time.Sleep(5 * time.Second)
+	res, err := http.Get(makeUrl("/hash/1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		log.Fatalf("Response failed with status code: %d\n", res.StatusCode)
+	}
+
+	if res.ContentLength == 0 {
+		log.Fatalf("Response contained no data\n")
 	}
 }

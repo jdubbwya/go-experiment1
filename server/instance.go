@@ -37,9 +37,6 @@ func (i *Instance) BaseUrl() string {
 }
 
 func (i *Instance) Kill(){
-	if i.IsAlive() {
-		close(i.monitor.channel)
-	}
 	if err := i.server.Shutdown(context.Background()); err != nil {
 		// Error from closing listeners, or context timeout:
 		log.Printf("HTTP server Shutdown: %v", err)
