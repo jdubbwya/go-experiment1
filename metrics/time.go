@@ -3,29 +3,30 @@ package metrics
 import "time"
 
 type TimeMetric struct {
+	Metric
 	start time.Time
 	end *time.Time
 }
 
-func TimeStartCapture() *TimeMetric{
+func NewTimeMetric() *TimeMetric{
 	return &TimeMetric{
 		start: time.Now(),
 		end : nil,
 	}
 }
 
-func TimeStopCapture( m *TimeMetric ){
+func (t *TimeMetric) Stop(){
 	var end = time.Now()
-	m.end = &end
+	t.end = &end
 
-	go captureTime(m)
+	go captureTime(t)
 }
 
-func TimeElapsedDuration( m *TimeMetric ) *time.Duration {
-	if m.end == nil {
+func (t *TimeMetric) ElapsedDuration() *time.Duration {
+	if t.end == nil {
 		return nil
 	}
 
-	var elapsed = m.end.Sub(m.start)
+	var elapsed = t.end.Sub(t.start)
 	return &elapsed
 }

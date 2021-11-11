@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-
 type timingReport struct {
 	TotalRequests int64
 	TotalMicroseconds int64
@@ -17,7 +16,7 @@ var TimeReport = timingReport{
 }
 
 func captureTime( m *TimeMetric ){
-	var timeElapsed *time.Duration = TimeElapsedDuration(m)
+	var timeElapsed *time.Duration = m.ElapsedDuration()
 
 	if timeElapsed != nil {
 		atomic.AddInt64(&TimeReport.TotalRequests, 1)
