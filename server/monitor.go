@@ -5,27 +5,28 @@ import (
 	"sync"
 )
 
-// As long as this channel is open shutdown has not been called
-type monitor struct  {
-	Channel chan struct{}
-	WaitGroup sync.WaitGroup
+type Monitor struct  {
+	channel chan struct{}
+	waitGroup sync.WaitGroup
 }
 
-var Monitor = monitor {
-	Channel: make(chan struct{}),
+func newMonitor() *Monitor{
+	return &Monitor {
+		channel: make(chan struct{}),
+	}
 }
 
-func MonitorHandler(handler http.Handler) http.Handler {
+func monitorHandler(handler http.Handler, monitor *Monitor) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		select {
-		case <-Monitor.Channel:
+		case <-monitor.channel:
 			//prevent work from being done
 			return
 		default:
 		}
 
-		Monitor.WaitGroup.Add(1)
+		monitor.waitGroup.Add(1)
 		handler.ServeHTTP(w, r)
-		defer Monitor.WaitGroup.Done()
+		defer monitor.waitGroup.Done()
 	})
 }

@@ -14,7 +14,7 @@ const TransactionUnknown = 0
 const TransactionInProgress = 1
 const TransactionComplete = 2
 
-var TransactionReceiptPause = 5 * time.Second // 5 seconds
+var TransactionReceiptPause = 4 * time.Second
 
 // Tracks the previous allocated transaction ids
 var upperTransactionId int64 = 0

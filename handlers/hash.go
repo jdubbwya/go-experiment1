@@ -3,7 +3,6 @@ package handlers
 import (
 	"fmt"
 	"github.com/jdubbwya/go-experiment1/hasher"
-	"github.com/jdubbwya/go-experiment1/metrics"
 	"github.com/jdubbwya/go-experiment1/server/responses"
 	"io"
 	"log"
@@ -20,8 +19,6 @@ func HashAddTransactionHandler(w http.ResponseWriter, r *http.Request){
 		return
 	}
 
-	var metricTimeToCompleteTransaction *metrics.TimeMetric = metrics.TimeStartCapture()
-	defer metrics.TimeStopCapture(metricTimeToCompleteTransaction)
 	var rawPassword = r.Form.Get("password")
 
 	if len(rawPassword) == 0 {

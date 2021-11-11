@@ -3,13 +3,17 @@ package metrics
 import "time"
 
 type TimeMetric struct {
-	Metric
+	NamedMetric
 	start time.Time
 	end *time.Time
 }
 
-func NewTimeMetric() *TimeMetric{
-	return &TimeMetric{
+func NewTimeMetric(name string) TimeMetric{
+	namedMetric := NamedMetric{
+		name: name,
+	}
+	return TimeMetric{
+		NamedMetric: namedMetric,
 		start: time.Now(),
 		end : nil,
 	}
@@ -19,7 +23,7 @@ func (t *TimeMetric) Stop(){
 	var end = time.Now()
 	t.end = &end
 
-	go captureTime(t)
+	Capture(t)
 }
 
 func (t *TimeMetric) ElapsedDuration() *time.Duration {
