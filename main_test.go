@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 )
@@ -47,6 +46,10 @@ func TestServerSuite(t *testing.T) {
 			name: "Server: /hash/{id} responds after 5 seconds",
 			test: serverTestCaseHashTransactionAfter5seconds,
 		},
+		{
+			name: "Server: can handle parallel requests",
+			test: serverTestCanHandleParallelRequests,
+		},
 	}
 
 	for _, c := range cases {
@@ -60,58 +63,46 @@ func TestServerSuite(t *testing.T) {
 
 func serverTestCaseGracefulShutdown(t *testing.T) {
 
-	var parallelGets = sync.WaitGroup{}
 
-	type httpResponse struct {
+	type endpointTestCase struct {
+		name string
+		path string
 		err *error
 		statusCode int
 	}
 
-	statsResponse := httpResponse{
-		err : nil,
-		statusCode: http.StatusInternalServerError,
-	}
-	shutdownResponse := httpResponse{
-		err : nil,
-		statusCode: http.StatusInternalServerError,
-	}
-
-	parallelGets.Add(2)
-
-	go func(wg *sync.WaitGroup, response *httpResponse) {
-		res, err := http.Get(makeUrl("/stats"))
-		response.statusCode = res.StatusCode
-		if err != nil {
-			response.err = &err
-		}
-		wg.Done()
-	}( &parallelGets, &statsResponse )
-
-	go func(wg *sync.WaitGroup, response *httpResponse) {
-		res, err := http.Get(makeUrl("/shutdown"))
-		(*response).statusCode = res.StatusCode
-		if err != nil {
-			(*response).err = &err
-		}
-		wg.Done()
-	}( &parallelGets, &shutdownResponse )
-
-	parallelGets.Wait()
-
-	if statsResponse.err != nil {
-		t.Fatal(statsResponse.err)
+	testCases := [] endpointTestCase{
+		endpointTestCase{
+			name: "Stats returns data",
+			path: "/stats",
+			err: nil,
+			statusCode: http.StatusInternalServerError,
+		},
+		endpointTestCase{
+			name: "Shutdown returns data",
+			path: "/shutdown",
+			err: nil,
+			statusCode: http.StatusInternalServerError,
+		},
 	}
 
-	if statsResponse.statusCode > 299 {
-		log.Fatalf("Status response failed with status code: %d\n", statsResponse.statusCode)
-	}
+	for _, c := range testCases {
+		t.Run( c.name, func(t *testing.T) {
+			t.Parallel()
+			res, err := http.Get(makeUrl(c.path))
+			c.statusCode = res.StatusCode
+			if err != nil {
+				c.err = &err
+			}
 
-	if shutdownResponse.err != nil {
-		t.Fatal(shutdownResponse.err)
-	}
+			if c.err != nil {
+				t.Fatal(c.err)
+			}
 
-	if shutdownResponse.statusCode > 299 {
-		log.Fatalf("Shutdown response failed with status code: %d\n", shutdownResponse.statusCode)
+			if c.statusCode > 299 {
+				t.Fatalf("Response failed with status code: %d\n", c.statusCode)
+			}
+		})
 	}
 }
 
@@ -133,5 +124,26 @@ func serverTestCaseHashTransactionAfter5seconds(t *testing.T) {
 
 	if res.ContentLength == 0 {
 		log.Fatalf("Response contained no data\n")
+	}
+}
+
+func serverTestCanHandleParallelRequests(t *testing.T) {
+	var i int
+	for i = 0; i < 50; i ++ {
+		t.Run(fmt.Sprintf("Parallel Request to /stats #%d", i), func(t *testing.T) {
+			t.Parallel()
+			res, err := http.Get(makeUrl("/stats"))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if res.StatusCode != http.StatusOK {
+				t.Fatalf("Response failed with status code: %d\n", res.StatusCode)
+			}
+
+			if res.ContentLength <= 0 {
+				t.Fatalf("Response content length was 0\n")
+			}
+		})
 	}
 }

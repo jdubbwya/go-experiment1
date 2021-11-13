@@ -1,16 +1,12 @@
 package server
 
-import (
-	"log"
-)
+import "log"
 
-func Start(addr *string) Instance {
+func Start(addr *string) {
 
 	instance := NewInstance(addr)
 
-
-	defer instance.Start()
 	log.Println("Server listening at http://localhost:8080")
+	instance.Start()
 
-	return instance
 }

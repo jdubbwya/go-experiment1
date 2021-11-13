@@ -35,7 +35,7 @@ func HashAddTransactionHandler(w http.ResponseWriter, r *http.Request){
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	io.WriteString(w, fmt.Sprintf("%d", id))
+	io.WriteString(w, fmt.Sprintf("%d\n", id))
 
 }
 

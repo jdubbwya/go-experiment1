@@ -3,18 +3,54 @@ package stats
 import (
 	"context"
 	"github.com/jdubbwya/go-experiment1/metrics"
+	"sync"
 	"time"
 )
+
+type monitor struct {
+	ctx  context.Context
+	stop context.CancelFunc
+}
+
+func newMonitor(a *Aggregator) monitor {
+	ctx, done := context.WithCancel(context.Background())
+
+	// start a monitor routine to capture the metrics
+	go func(aggregator *Aggregator) {
+	monitorLoop:
+		for {
+			select {
+			case metric, ok := <-aggregator.metrics:
+				if !ok {
+					return
+				}
+				aggregator.totalRequests++
+
+				metricElapsedDuration := metric.ElapsedDuration()
+				if metricElapsedDuration != nil {
+					aggregator.totalProcessingTime = aggregator.totalProcessingTime + metricElapsedDuration.Nanoseconds()
+				}
+			case <-ctx.Done():
+				break monitorLoop
+			}
+		}
+	}(a)
+
+	return monitor{
+		ctx:  ctx,
+		stop: done,
+	}
+}
 
 type Aggregator struct {
 	metrics.Aggregator
 
 	metrics chan metrics.TimeMetric
-	monitorCancel context.CancelFunc
+	monitorMu sync.Mutex
+	monitor *monitor
 
-	totalRequests int64
+	totalRequests       int64
 	totalProcessingTime int64
-
 }
 
 func (a *Aggregator) TotalRequests() int64 {
@@ -28,7 +64,7 @@ func (a *Aggregator) AverageRequestDuration() time.Duration {
 	return 0
 }
 
-func (a Aggregator) Collect(m metrics.Metric)  {
+func (a Aggregator) Collect(m metrics.Metric) {
 	if m.Name() == "stats" {
 		t := m.(metrics.TimeMetric)
 		t.Stop()
@@ -39,37 +75,22 @@ func (a Aggregator) Collect(m metrics.Metric)  {
 	}
 }
 
-func (a Aggregator) Stop()  {
-	a.monitorCancel()
+func (a Aggregator) Stop() {
+	a.monitorMu.Lock()
+	if a.monitor != nil {
+		a.monitor.stop()
+		a.monitor = nil
+	}
+	a.monitorMu.Unlock()
 }
 
 func NewStatsAggregator() *Aggregator {
-	ctx, ctxCancel := context.WithCancel(context.Background())
-
 	aggregator := Aggregator{
 		metrics: make(chan metrics.TimeMetric),
-		monitorCancel: ctxCancel,
 	}
 
-	// start a monitor routine to capture the metrics
-	go func(aggregator *Aggregator) {
-		for {
-			select {
-			case metric, ok := <-aggregator.metrics:
-				if !ok {
-					return
-				}
-				aggregator.totalRequests++
-
-				metricElapsedDuration := metric.ElapsedDuration()
-				if metricElapsedDuration != nil {
-					aggregator.totalProcessingTime = aggregator.totalProcessingTime+ metricElapsedDuration.Nanoseconds()
-				}
-			case <-ctx.Done():
-				break
-			}
-		}
-	}(&aggregator)
+	mon := newMonitor(&aggregator)
+	aggregator.monitor = &mon
 
 	return &aggregator
 }
